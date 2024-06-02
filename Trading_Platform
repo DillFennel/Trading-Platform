@@ -37,10 +37,6 @@ contract Trading_Platform {
         string provider_phone_number;
         string provider_mail;
     }
-    struct Provider_info{
-        string provider_phone_number;
-        string provider_mail;
-    }
     struct Answer_out{
         uint id;
         string name;
@@ -116,9 +112,9 @@ contract Trading_Platform {
         string memory provider_phone_number,
         string memory provider_mail
     ) public{
-        require(order_exist[id_order]);
-        require(orders[id_order].addr_buyer != msg.sender);
-        require(orders[id_order].status ==  Status.Posted);
+        require(order_exist[id_order], "This order doesn't exist");
+        require(orders[id_order].addr_buyer != msg.sender, "You don't have access to this order");
+        require(orders[id_order].status ==  Status.Posted, "Wrong order status");
         require(bytes(name).length > 0);
         require(bytes(description).length > 0);
         require(bytes(provider_phone_number).length > 0);
@@ -195,7 +191,7 @@ contract Trading_Platform {
         return ret;
     }
     function get_answers_to(uint id_order) public view returns(Answer_out [] memory ret){
-        require(order_exist[id_order], "Error 14");
+        require(order_exist[id_order], "14");
         ret = new Answer_out[](answers_to[id_order].length);
         for(uint i=0; i<answers_to[id_order].length; i++){
             ret[i] = Answer_out(answers_to[id_order][i], answers[answers_to[id_order][i]].name, answers[answers_to[id_order][i]].price, answers[answers_to[id_order][i]].description);
@@ -203,9 +199,9 @@ contract Trading_Platform {
         return ret;
     }
     function delete_order(uint id_order) public {
-        require(order_exist[id_order], "Error 15");
-        require(orders[id_order].addr_buyer == msg.sender, "Error 16");
-        require(orders[id_order].status == Status.Posted, "Error 17");
+        require(order_exist[id_order], "This oreder doesn't exist");
+        require(orders[id_order].addr_buyer == msg.sender, "You don't have access to this order");
+        require(orders[id_order].status == Status.Posted, "Wrong order status");
         stats.current_orders --;
         stats_of[msg.sender].current_orders--;
         for(uint i=0; i<answers_to[id_order].length; i++){
@@ -218,23 +214,23 @@ contract Trading_Platform {
         orders[id_order].status = Status.Cancelled;
     }
     function delete_answer(uint id_answer) public {
-        require(answer_exist[id_answer], "Error 18");
-        require(answers[id_answer].addr_provider == msg.sender, "Error 19");
-        require(answers[id_answer].status == Status.Posted, "Error 20");
+        require(answer_exist[id_answer], "This answer doesn't exist");
+        require(answers[id_answer].addr_provider == msg.sender, "You don't have access to this answer");
+        require(answers[id_answer].status == Status.Posted, "Wrong answer status");
         stats.current_answers --;
         stats_of[msg.sender].current_answers--;
         answers[id_answer].status = Status.Cancelled;
     }
-    function choose_answer(uint id_order, uint id_answer) public payable returns(Provider_info memory){//Закупщик выбирает ответ поставщика и платит платформе
+    function choose_answer(uint id_order, uint id_answer) public payable returns(Answer memory){//Закупщик выбирает ответ поставщика и платит платформе
         require(order_exist[id_order], "Error 21");
         require(answer_exist[id_answer], "Error 22");
         require(msg.sender == orders[id_order].addr_buyer, "Error 23");
         require(answers[id_answer].id_order == id_order, "Error 24");
         require(orders[id_order].status == Status.Posted, "Error 25");
         require(answers[id_answer].status == Status.Posted, "Error 26");
-        require((msg.sender).balance >= answers[id_answer].price + fee, "Error 27");
+        require(msg.value >= answers[id_answer].price + fee, "Error 27");
 
-        payable(address(this)).transfer(answers[id_answer].price+ fee); //Платим торговой платформе
+        payable(address(this)).transfer(msg.value); //Платим торговой платформе
         orders[id_order].status = Status.Chosen;
         stats_of[orders[id_order].addr_buyer].current_orders --;
         answers[id_answer].status = Status.Chosen;
@@ -251,7 +247,7 @@ contract Trading_Platform {
             }
         }
         answers_to[id_order] = [id_answer];
-        return Provider_info(answers[id_answer].provider_phone_number, answers[id_answer].provider_mail);
+        return answers[id_answer];
     }
     function pay_address(address payable addr, uint amount) private {
         payable(addr).transfer(amount);
