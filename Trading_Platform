@@ -62,10 +62,6 @@ contract Trading_Platform {
         require(msg.sender == owner);
         owner = new_owner;
     }
-    function change_fee(uint new_fee) public{
-        require(msg.sender == owner);
-        fee = new_fee;
-    }
     function get_owner() public view returns(address){
         return owner;
     }
