@@ -1,0 +1,280 @@
+// SPDX-License-Identifier: GPL-3.0
+pragma solidity >=0.8.2 <0.9.0;
+contract Trading_Platform {
+    fallback() external payable { }
+    receive() external payable {  }
+
+    struct TPStats {
+        uint all_orders;
+        uint current_orders;
+        uint all_answers;
+        uint current_answers;
+    }
+    enum Status {
+        Posted,
+        Chosen,
+        Sent,
+        Completed,
+        Cancelled
+    }
+    struct Order {
+        uint id;
+        address addr_buyer;
+        string name;
+        string description;
+        Status status;
+        string buyer_phone_number;
+        string buyer_mail;
+    }
+    struct Answer {
+        uint id;
+        uint id_order;
+        string name;
+        address addr_provider;
+        string description;
+        uint price;
+        Status status;
+        string provider_phone_number;
+        string provider_mail;
+    }
+    struct Provider_info{
+        string provider_phone_number;
+        string provider_mail;
+    }
+    struct Answer_out{
+        uint id;
+        string name;
+        uint price;
+        string description;
+    }
+    address payable  private owner;
+    TPStats private stats;
+    uint private fee;
+    Order[] private orders;
+    Answer[] private answers;
+    mapping(address => uint[]) private orders_of;
+    mapping(address => uint[]) private answers_of;
+    mapping(uint => uint[]) private answers_to;
+    mapping(address => TPStats) private stats_of;
+    mapping(uint => bool) private order_exist;
+    mapping(uint => bool) private answer_exist;
+    function change_owner(address payable new_owner) public{
+        require(msg.sender == owner);
+        owner = new_owner;
+    }
+    function change_fee(uint new_fee) public{
+        require(msg.sender == owner);
+        fee = new_fee;
+    }
+    function get_owner() public view returns(address){
+        return owner;
+    }
+    function get_balance() public view returns(uint){ return address(this).balance;}
+    function get_tp_stats() public view returns(TPStats memory){
+        return stats;
+    }
+    function get_user_stats(address addr) public view returns(TPStats memory){ 
+        return stats_of[addr];
+    }
+    function get_fee() public view returns(uint){
+        return fee;
+    }
+    constructor(uint _fee){
+        owner = payable(msg.sender);
+        fee = _fee;
+    }
+    function create_order(
+        string memory name,
+        string memory description,
+        string memory buyer_phone_number,
+        string memory buyer_mail
+    ) public {
+        require(bytes(name).length > 0);
+        require(bytes(description).length > 0);
+        require(bytes(buyer_phone_number).length > 0);
+        require(bytes(buyer_mail).length > 0);
+
+        order_exist[stats.all_orders] = true;
+        stats_of[msg.sender].current_orders++;
+        stats_of[msg.sender].all_orders++;
+        Order memory order;
+        order.id = stats.all_orders;
+        orders_of[msg.sender].push(stats.all_orders);
+
+        stats.all_orders++;
+        stats.current_orders++;
+
+        order.addr_buyer = msg.sender;
+        order.name = name;
+        order.description = description;
+        order.status = Status.Posted;
+        order.buyer_phone_number = buyer_phone_number;
+        order.buyer_mail = buyer_mail;
+        orders.push(order);
+    }
+    function create_answer(
+        uint id_order,
+        string memory name,
+        uint price,
+        string memory description,
+        string memory provider_phone_number,
+        string memory provider_mail
+    ) public{
+        require(order_exist[id_order]);
+        require(orders[id_order].addr_buyer != msg.sender);
+        require(orders[id_order].status ==  Status.Posted);
+        require(bytes(name).length > 0);
+        require(bytes(description).length > 0);
+        require(bytes(provider_phone_number).length > 0);
+        require(bytes(provider_mail).length > 0);
+
+        answer_exist[stats.all_answers] = true;
+        stats_of[msg.sender].current_answers++;
+        stats_of[msg.sender].all_answers++;
+        Answer memory answer;
+        answer.id = stats.all_answers;
+        answer.id_order = id_order;
+        answers_of[msg.sender].push(stats.all_answers);
+        answers_to[id_order].push(stats.all_answers);
+
+        stats.all_answers++;
+        stats.current_answers++;
+
+        answer.addr_provider = msg.sender;
+        answer.name = name;
+        answer.status = Status.Posted;
+        answer.price = price;
+        answer.description = description;
+        answer.provider_phone_number = provider_phone_number;
+        answer.provider_mail = provider_mail;
+        answers.push(answer);
+    }
+    function get_current_orders() public view returns(Order[] memory ret){
+        ret = new Order[](stats.current_orders);
+        uint elem = 0;
+        for(uint id_order=0; id_order<stats.current_orders; id_order++){
+            if(orders[id_order].status != Status.Cancelled && orders[id_order].status != Status.Completed){
+                ret[elem] = orders[id_order];
+                elem++;
+            }
+        }
+        return ret;
+    }
+    function get_current_orders_of(address addr) public view returns(Order[] memory ret){
+        ret = new Order[](stats_of[addr].current_orders);
+        uint elem = 0;
+        for(uint i=0; i<stats_of[addr].all_orders; i++){
+            if(orders[orders_of[addr][i]].status != Status.Cancelled && orders[orders_of[addr][i]].status != Status.Completed){
+                ret[elem] = orders[orders_of[addr][i]];
+                elem++;
+            }
+        }
+        return ret;
+    }
+    function get_all_orders_of() public view returns(Order[] memory ret){
+        ret = new Order[](stats_of[msg.sender].all_orders);
+        uint elem = 0;
+        for(uint i=0; i<stats_of[msg.sender].all_orders; i++){
+            ret[elem] = orders[orders_of[msg.sender][i]];
+            elem++;
+        }
+        return ret;
+    }
+    function get_all_answers_of() public view returns(Answer[] memory ret){
+        ret = new Answer[](stats_of[msg.sender].all_answers);
+        uint elem = 0;
+        for(uint i=0; i<stats_of[msg.sender].all_answers; i++){
+            ret[elem] = answers[answers_of[msg.sender][i]];
+            elem++;
+        }
+        return ret;
+    }
+    function get_current_answers_of() public view returns(Answer[] memory ret){
+        ret = new Answer[](stats_of[msg.sender].current_answers);
+        uint elem = 0;
+        for(uint i=0; i<stats_of[msg.sender].current_answers; i++){
+            ret[elem] = answers[answers_of[msg.sender][i]];
+            elem++;
+        }
+        return ret;
+    }
+    function get_answers_to(uint id_order) public view returns(Answer_out [] memory ret){
+        require(order_exist[id_order], "Error 14");
+        ret = new Answer_out[](answers_to[id_order].length);
+        for(uint i=0; i<answers_to[id_order].length; i++){
+            ret[i] = Answer_out(answers_to[id_order][i], answers[answers_to[id_order][i]].name, answers[answers_to[id_order][i]].price, answers[answers_to[id_order][i]].description);
+        }
+        return ret;
+    }
+    function delete_order(uint id_order) public {
+        require(order_exist[id_order], "Error 15");
+        require(orders[id_order].addr_buyer == msg.sender, "Error 16");
+        require(orders[id_order].status == Status.Posted, "Error 17");
+        stats.current_orders --;
+        stats_of[msg.sender].current_orders--;
+        for(uint i=0; i<answers_to[id_order].length; i++){
+            if(answers[answers_to[id_order][i]].status == Status.Posted){
+                stats.current_answers--;
+                stats_of[answers[answers_to[id_order][i]].addr_provider].current_answers--;
+            }
+            answers[answers_to[id_order][i]].status = Status.Cancelled;
+        }
+        orders[id_order].status = Status.Cancelled;
+    }
+    function delete_answer(uint id_answer) public {
+        require(answer_exist[id_answer], "Error 18");
+        require(answers[id_answer].addr_provider == msg.sender, "Error 19");
+        require(answers[id_answer].status == Status.Posted, "Error 20");
+        stats.current_answers --;
+        stats_of[msg.sender].current_answers--;
+        answers[id_answer].status = Status.Cancelled;
+    }
+    function choose_answer(uint id_order, uint id_answer) public payable returns(Provider_info memory){//Закупщик выбирает ответ поставщика и платит платформе
+        require(order_exist[id_order], "Error 21");
+        require(answer_exist[id_answer], "Error 22");
+        require(msg.sender == orders[id_order].addr_buyer, "Error 23");
+        require(answers[id_answer].id_order == id_order, "Error 24");
+        require(orders[id_order].status == Status.Posted, "Error 25");
+        require(answers[id_answer].status == Status.Posted, "Error 26");
+        require((msg.sender).balance >= answers[id_answer].price + fee, "Error 27");
+
+        payable(address(this)).transfer(answers[id_answer].price+ fee); //Платим торговой платформе
+        orders[id_order].status = Status.Chosen;
+        stats_of[orders[id_order].addr_buyer].current_orders --;
+        answers[id_answer].status = Status.Chosen;
+        stats_of[answers[id_answer].addr_provider].current_answers --;
+        stats.current_orders --;
+        stats.current_answers --;
+        for(uint i=0; i<answers_to[id_order].length; i++){
+            if(answers[answers_to[id_order][i]].status == Status.Posted){
+                stats.current_answers--;
+                stats_of[msg.sender].current_answers--;
+            }
+            if(answers_to[id_order][i] != id_answer){
+                answers[id_answer].status = Status.Cancelled;
+            }
+        }
+        answers_to[id_order] = [id_answer];
+        return Provider_info(answers[id_answer].provider_phone_number, answers[id_answer].provider_mail);
+    }
+    function pay_address(address payable addr, uint amount) private {
+        payable(addr).transfer(amount);
+    }
+    function product_sent(uint id_answer) public {
+        require(answer_exist[id_answer], "Error 28");
+        require(msg.sender == answers[id_answer].addr_provider, "Error 29");
+        require(answers[id_answer].status == Status.Chosen, "Error 30");
+        pay_address(payable(msg.sender), answers[id_answer].price/2); //Половину стоимости заказа отправляем поставщику
+        orders[answers[id_answer].id_order].status = Status.Sent;
+        answers[id_answer].status = Status.Sent;
+    }
+    function complete_order(uint id_order) public {
+        require(order_exist[id_order], "Q");
+        require(msg.sender == orders[id_order].addr_buyer, "W");
+        require(orders[id_order].status == Status.Sent, "E");
+        pay_address(payable(msg.sender), answers[answers_to[id_order][0]].price - answers[answers_to[id_order][0]].price/2);//Отправляем поставщику вторую половину стоимости заказа
+        pay_address(owner, fee); //Отправляем пошлину владельцу платформы
+        orders[id_order].status = Status.Completed;
+        answers[answers_to[id_order][0]].status = Status.Completed;
+    }
+}
